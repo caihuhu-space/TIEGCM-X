@@ -1,0 +1,5 @@
+#define ZIBOT (-7.0)
+#define ZITOP (7.0)
+#define ZMBOT (-6.75)
+#define ZMTOP (7.25)
+#define NLEV (28)

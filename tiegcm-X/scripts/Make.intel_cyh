@@ -1,0 +1,46 @@
+#
+# Included makefile for Intel ifort compiler with openmpi on 64-bit HAO machines.
+# Intel ifort (IFORT) 12.0.0 20101006
+#
+F90      = ifort
+MPIF90   = mpif90 -fc=ifort
+MPIRUN   = mpirun -l -s all
+FFLAGS   = -r8 -heap-arrays
+DBGFLAGS = -debug full -traceback 
+DBGFLAGS += -check bounds -check format -check output_conversion -check pointers -check uninit
+DBGFLAGS += -fpe-all=0 # this traps all floating point exceptions
+#
+# Makefile will use OPTIM = -g if set debug=TRUE in job script.
+OPTIM    = -O3
+#LIBS     =  -lnetcdff -lhdf5_hl -lhdf5 -lsz -lz -L/opt/soft/netcdf4/lib
+#LIBS     = -lnetcdff -L/usr/lib -lz -L/usr/local/netcdf4/lib
+#LIBS     =  -lnetcdff -lhdf5_hl -lhdf5 -lsz -L/usr/lib64 -lz -L/opt/soft/netcdf4/lib
+LIBS     =  -lnetcdff -lhdf5_hl -lhdf5 -lsz -lz -L/opt/soft/netcdf4/lib
+HOST     = $(shell hostname)
+#
+# Library and Include file paths:
+#
+LIB_NETCDF = /opt/soft/netcdf4/lib
+INC_NETCDF = /opt/soft/netcdf4/include
+#LIB_NETCDF = /pub/opt/netcdf/lib
+#INC_NETCDF = /pub/opt/netcdf/include
+#
+# This public release of ESMF was built at hao with intel on Dec 22, 2015:
+#
+LIB_ESMF = /opt/soft/esmf-ESMF_8_1_1/install/lib/libO/Linux.intel.64.intelmpi.default/
+#
+# Make machines.ini file for MPI execution: 
+#
+prereq: machines.ini mpirun.command
+machines.ini: export HN=$(HOST)
+machines.ini: export NP=$(NPROC)
+machines.ini: FORCE
+	@echo "Making machines.ini.."
+	@echo `hostname` > machines.ini
+	@awk 'BEGIN{ for (i=2; i <= ENVIRON["NP"]; i++) print ENVIRON["HN"] }' >> machines.ini
+
+mpirun.command: FORCE
+	@echo "Making mpirun.command: MPIRUN=$(MPIRUN)"
+	@echo $(MPIRUN) > mpirun.command
+
+FORCE:

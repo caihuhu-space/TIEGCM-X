@@ -1,0 +1,7 @@
+#define NLAT  (288)
+#define GLAT1 (-89.6875)
+#define DLAT  (0.625)
+
+#define NLON  (576)
+#define GLON1 (-180.)
+#define DLON  (0.625)

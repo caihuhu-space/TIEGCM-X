@@ -1,0 +1,49 @@
+&tgcm_input
+ START_YEAR = 2021
+ START_DAY  = 110
+ CALENDAR_ADVANCE = 1
+ SOURCE = '$TGCMDATA/zp11/tiegcm-X_res2.5_mareqx_smax_prim.nc'
+! SOURCE = '/glade/work/ycai/tiegcm2.5_dec/tiegcm.exec/z11_Nov20storm_tiegcm-X_res2.5x0.25_prim_001.nc'
+! SOURCE = '/glade/p/hao/tgcm/data/tiegcm2.0/tiegcm_res0.25_decsol_smax_prim.nc'
+ SOURCE_START = 80 0 0 0
+ START = 110 0 0 0
+ STOP  = 136 0 0 0
+ STEP  = 10
+! OPLUS_STEP = 0.5
+ NSTEP_SUB = 100
+ HIST = 1 0 0 0
+ OUTPUT = 'z11_tiegcm-X_res2.5x0.25_mareqx_smax_prim_001.nc','to',
+          'z11_tiegcm-X_res2.5x0.25_mareqx_smax_prim_366.nc','by','1'
+ MXHIST_PRIM = 100
+ SECSTART = 130 0 0 0
+ SECSTOP  = 136 0 0 0
+ SECHIST  =  0 0 30 0
+ SECOUT   = 'z11_tiegcm-X_sech_2021_130.nc','to', 'z11_tiegcm-X_sech_2021_366.nc','by','1'
+ MXHIST_SECH = 48
+! SECFLDS = 'TN' 'UN' 'VN' 'WN' 'NE' 'HE' 'DJINT' 'TE' 'TI' 'ZG' 'ZGMID' 'Z' 'ZL' 'ZP'
+!           'DUV_G' 'TNI' 'DWDZ' 'SS_UN' 'SS_VN' 'ADVEC_U0' 'ADVEC_U1' 'ADVEC_U2'
+!           'ADVEC_V0' 'ADVEC_V1' 'ADVEC_V2' 'DLDP_ZIN' 'LXX' 'LYY' 'LXY' 'LYX'
+!           'SIGMA_HAL' 'SIGMA_PED' 'LAMDA_HAL' 'LAMDA_PED' 'LAMDA1' 'LAMDA2' 
+!           'LAMDA1TMP' 'LAMDA2TMP' 'XNMBAR' 'FLX_HE'
+ SECFLDS = 'TN' 'UN' 'VN' 'WN' 'O2' 'O1' 'N2' 'NO' 'N4S' 'HE' 'NE' 'DJ' 'OP' 'O2P' 'NP_diag' 
+           'NOP_diag' 'N2P_diag' 'TE' 'TI' 'FE_KI' 'TEC' 'OPFLUX' 'POTEN' 'UI_ExB' 'VI_ExB'
+           'WI_ExB' 'DEN' 'QJOULE' 'HMF2' 'NMF2' 'Z' 'ZG' 'ZGMID' 'FLX_HE' 'EEX' 'EEY' 'EEZ'
+           'VD' 'op_dt' 'amb_diff' 'dwind' 'dfield' 'prod' 'ploss'
+!           'FLX_ARG' 'DJINT' 'SIGMA_HAL' 'SIGMA_PED' 'LAMDA_HAL' 'LAMDA_PED' 'LAMDA1' 'LAMDA2' 
+ GSWM_MI_DI_NCFILE  = '$TGCMDATA/gswm_diurn_2.5d_99km.nc'
+ GSWM_MI_SDI_NCFILE = '$TGCMDATA/gswm_semi_2.5d_99km.nc'
+ GSWM_NM_DI_NCFILE  = '$TGCMDATA/gswm_nonmig_diurn_2.5d_99km.nc'
+ GSWM_NM_SDI_NCFILE = '$TGCMDATA/gswm_nonmig_semi_2.5d_99km.nc'
+!POTENTIAL_MODEL = 'HEELIS'
+ POTENTIAL_MODEL = 'WEIMER'
+ GPI_NCFILE='$TGCMDATA/gpi_1958001-2023212.nc'
+ IMF_NCFILE='$TGCMDATA/imf_OMNI_2023001-2023365.nc'
+! POWER   = 18.
+! CTPOTEN = 30.
+! KP      = 1.
+! F107    = 180.
+! F107A   = 180.
+ COLFAC  = 1.26
+ CALC_HELIUM=1
+! OPDIFFCAP=6.0e8
+/

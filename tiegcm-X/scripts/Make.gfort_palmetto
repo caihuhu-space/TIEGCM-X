@@ -1,0 +1,39 @@
+#
+# Included makefile for building tiegcm with gfortran compiler on Linux desktop. 
+# Using GNU Fortran (GCC) 8.4.1 20200928 (Red Hat 8.4.1-1)
+#
+F90    = gfortran
+MPIF90 = mpifort
+MPIRUN = mpiexec
+FFLAGS = -mcmodel=medium -fdefault-real-8
+FFLAGS += -fno-range-check # required for sub check_nans in util.F
+OPTIM   = -O3
+#
+DBGFLAGS   = -Og -Wall -Wextra -fcheck=all,no-array-temps -fbacktrace
+#
+# Library and Include file paths:
+#
+# Makefile will include $(LIB_ESMF)/esmf.mk
+# This ESMF lib was built with gfortran/openmpi with mpifort
+#
+LIB_ESMF = /zfs/luatmos/software/lib/libO/Linux.gfortran.64.openmpi.default
+LIBS     = -lcurl
+#
+HOST     = $(shell hostname)
+#
+# Make machines.ini file for MPI execution: 
+#
+prereq: machines.ini mpirun.command
+machines.ini: export HN=$(HOST)
+machines.ini: export NP=$(NPROC)
+machines.ini: FORCE
+	@echo "Making machines.ini.."
+	@echo `hostname` > machines.ini
+	@awk 'BEGIN{ for (i=2; i <= ENVIRON["NP"]; i++) print ENVIRON["HN"] }' >> machines.ini
+
+mpirun.command: FORCE
+	@echo "Making mpirun.command: MPIRUN=$(MPIRUN)"
+	@echo $(MPIRUN) > mpirun.command
+
+FORCE:
+

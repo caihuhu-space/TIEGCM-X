@@ -1,0 +1,298 @@
+#!/bin/tcsh
+# Job script to build and execute TIEGCM on the Clemson supercomputer Palmetto,
+# or similar system running PBS (Load Sharing Facility)
+#
+# This script should be executed on the palmetto command line.
+# It will compile in execdir on the interactive login node, then create and 
+# submit an PBS script based on the #PBS resources specified below.
+#
+# User should set shell variables and #PBS settings below:
+#
+#   modeldir:  Root directory to model source (may be an SVN working dir)
+#   execdir:   Directory in which to build and execute (will be created if necessary)
+#   tgcmdata:  Directory in which startup history and data files are accessed.
+#              (If tgcmdata is not set, the model will use env var TGCMDATA)
+#   input:     Namelist input file for the chosen model resolution
+#   output:    Stdout file from model execution (will be created)
+#   horires:   Model resolution (5, 2.5, 1.25 or 0.625 degrees)
+#   vertres:   Model resolution (0.5, 0.25, 0.125 or 0.0625 degrees)
+#   make:      Build file with platform-specific compile parameters (in scripts dir)
+#   mpi:       TRUE/FALSE for MPI run (non-MPI runs are not supported in v2.0 and later)
+#   debug:     If TRUE, build and execute a "debug" run (debug compiler flags are set)
+#   exec:      If TRUE, execute the model (build only if exec is FALSE)
+#   utildir:   Directory containing supporting scripts (default $modeldir/scripts)
+#   runscript: PBS script with run commands (submitted with qsub from execdir)
+#
+# To switch to 2.5x0.25-deg resolution, set horires below to 2.5 and vertres to 0.25,
+# and change execdir, tgcmdata and namelist input if necessary.
+# Also reset number of processors accordingly below (#PBS -l).
+#
+set modeldir = tiegcm2.5
+set execdir  = /scratch1/$user/tiegcm2.5/tiegcm.exec
+set tgcmdata = /zfs/luatmos/tiegcm/tiegcm2.5_data
+set input    = $modeldir/scripts/tiegcm2.5_default.inp
+set output   = tiegcm.out
+set horires  = 1.25
+set vertres  = 0.125
+set make     = Make.gfort_palmetto
+set mpi       = TRUE   # must be TRUE for tiegcm2.0 and later
+set debug     = FALSE
+set exec      = TRUE
+set utildir   = $modeldir/scripts
+set runscript = run.pbs
+@ nnodes = 1
+@ ncores_per_node = 40
+@ memsize = 372
+@ nprocs = $nnodes * $ncores_per_node
+
+set execdir   = `perl $utildir/abspath $execdir`
+set runscript = `perl $utildir/abspath $runscript`
+if (! -d $execdir) mkdir -p $execdir
+#
+# Set PBS resource usage (create the runscript in execdir):
+# (run commands are appended to this script below)
+#
+cat << EOF >! $runscript
+#!/bin/tcsh
+#
+#PBS -N tiegcm
+#PBS -q luatmos
+#PBS -j oe
+#PBS -l select=${nnodes}:ncpus=${ncores_per_node}:mpiprocs=${ncores_per_node}:mem=${memsize}gb:interconnect=hdr,walltime=12:00:00
+#
+EOF
+#
+#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#                               End user settings
+#                        Shell Script for TIEGCM Linux job
+#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#
+module load hdf5/1.10.7-gcc/8.4.1-mpi-cuda11_4
+#
+set mycwd = `pwd`
+echo "" ; echo "${0}:"
+echo "  Begin execution at `date`"
+echo "  Current working directory: $mycwd"
+echo "  System: `uname -a`"  
+echo ""
+#
+# Verify directories and make_machine file (make execdir if necessary).
+# Get absolute path for dirs that are accessed from the execdir.
+#
+if (! -d $modeldir) then
+  echo ">>> Cannot find model directory $modeldir <<<"
+  exit 1
+endif
+#
+# Executable file name:
+set model = tiegcm.exe
+
+if (! -d $utildir) then
+  echo ">>> Cannot find model scripts directory $utildir <<<" 
+  exit 1
+endif
+set utildir = `perl $utildir/abspath $utildir`
+
+set srcdir  = $modeldir/src
+if (! -d $srcdir) then
+  echo ">>> Cannot find model source directory $srcdir <<<"
+  exit 1
+endif
+set srcdir = `perl $utildir/abspath $srcdir`
+#
+# Set data directory:
+#   If tgcmdata is set above, use it to set (override) env var TGCMDATA
+#   If tgcmdata not set above, use env var TGCMDATA
+#   If neither are set, print a warning and set both to cwd.
+#   Finally, print warning if the directory does not exist.
+#
+if ($?tgcmdata) then
+  set tgcmdata = `perl $utildir/abspath $tgcmdata`
+  setenv TGCMDATA $tgcmdata
+  echo Set env var TGCMDATA = $TGCMDATA
+else
+  if ($?TGCMDATA) then
+    set tgcmdata = $TGCMDATA
+    echo Set tgcmdata = $TGCMDATA
+  else
+    echo WARNING: TGCMDATA is not set - using cwd
+    set tgcmdata = .
+    setenv TGCMDATA $tgcmdata
+  endif
+endif
+if (! -d $tgcmdata) echo ">>> Cannot find data directory $tgcmdata"
+
+if ($horires != 5 && $horires != 2.5 && $horires != 1.25 && $horires != 0.625) then
+  echo ">>> Unknown model resolution $horires <<<"
+  exit 1
+endif
+if ($vertres != 0.5 && $vertres != 0.25 && $vertres != 0.125 && $vertres != 0.0625) then
+  echo ">>> Unknown model resolution $vertres <<<"
+  exit 1
+endif
+#
+# Copy make files to execdir if necessary:
+#
+if (! -f $execdir/$make)     cp $utildir/$make $execdir
+if (! -f $execdir/Makefile)  cp $utildir/Makefile $execdir
+if (! -f $execdir/mkdepends) cp $utildir/mkdepends $execdir
+#
+# Make default namelist input file if not provided by user:
+#
+if (! -f $input) then
+  echo ">>> Cannot find namelist input file $input <<<"
+  exit 1
+endif
+
+set model  = $execdir/$model
+set input  = `perl $utildir/abspath $input`
+set output = `perl $utildir/abspath $output`
+set util   = `perl $utildir/abspath $utildir`
+set mklogs = $util/mklogs         # Nov, 2015: mklogs rewritten in python
+set rmbinchars = $util/rmbinchars # Nov, 2015: remove non-ascii chars from stdout files
+#
+# Report to stdout:
+#
+ set svn_revision = `svnversion $modeldir` || set svn_revision = "[none]"
+#set svn_revision = 'tiegcm2.5' # for svn tag instead of revision number
+
+echo -n "  Model directory:   $modeldir" && echo " (SVN revision $svn_revision)"
+echo "  Exec directory:    $execdir"
+echo "  Source directory:  $srcdir"
+echo "  Data directory:    $tgcmdata"
+echo "  Make machine file: $make"
+echo "  Namelist input:    $input"
+echo "  Stdout Output:     $output"
+echo "  Model resolution:  $horires x $vertres"
+echo "  Debug:             $debug"
+echo "  MPI job:           $mpi"
+#
+# If debug flag has changed from last gmake, clean execdir
+# and reset debug file:
+#
+if (-f $execdir/debug) then
+  set lastdebug = `cat $execdir/debug` 
+  if ($lastdebug != $debug) then
+    echo "Clean execdir $execdir because debug flag switched from $lastdebug to $debug"
+    set mycwd = `pwd` ; cd $execdir ; gmake clean ; cd $mycwd
+    echo $debug >! $execdir/debug
+  endif
+else
+  echo $debug >! $execdir/debug
+  echo "Created file debug with debug flag = $debug"
+endif
+#
+# If mpi flag has changed from last gmake, clean execdir
+# and reset mpi file:
+#
+if (-f $execdir/mpi) then
+  set lastmpi = `cat $execdir/mpi` 
+  if ($lastmpi != $mpi) then
+    echo "Clean execdir $execdir because mpi flag switched from $lastmpi to $mpi"
+    set mycwd = `pwd` ; cd $execdir ; gmake clean ; cd $mycwd
+    echo $mpi >! $execdir/mpi
+  endif
+else
+  echo $mpi >! $execdir/mpi
+  echo "Created file mpi with mpi flag = $mpi"
+endif
+#
+# Copy defs header file to execdir, if necessary, according to 
+# requested resolution. This should seamlessly switch between
+# resolutions according to $horires and $vertres.
+#
+set defs = defs.h
+if (-f $defs) rm $defs
+if ($horires == 5) cat $srcdir/hori5 >> $defs
+if ($horires == 2.5) cat $srcdir/hori2.5 >> $defs
+if ($horires == 1.25) cat $srcdir/hori1.25 >> $defs
+if ($horires == 0.625) cat $srcdir/hori0.625 >> $defs
+echo '' >> $defs
+if ($vertres == 0.5) cat $srcdir/vert0.5 >> $defs
+if ($vertres == 0.25) cat $srcdir/vert0.25 >> $defs
+if ($vertres == 0.125) cat $srcdir/vert0.125 >> $defs
+if ($vertres == 0.0625) cat $srcdir/vert0.0625 >> $defs
+if (-f $execdir/defs.h) then
+  cmp -s $execdir/defs.h $defs
+  if ($status == 1) then # files differ -> switch resolutions
+    echo "Switching defs.h for model resolution $horires x $vertres"
+    mv $defs $execdir/defs.h
+  else
+    echo "defs.h already set for model resolution $horires x $vertres"
+    rm $defs
+  endif 
+else # defs.h does not exist in execdir -> copy appropriate defs file
+  echo "Copying $defs to $execdir/defs.h for resolution $horires x $vertres"
+  mv $defs $execdir/defs.h
+endif
+#
+# cd to execdir and run make:
+#
+cd $execdir || echo ">>> Cannot cd to execdir $execdir" && exit 1
+echo ""
+echo "Begin building $model in `pwd`"
+#
+# Build Make.env file in exec dir, containing needed env vars for Makefile:
+#
+cat << EOF >! Make.env
+MAKE_MACHINE  = $make
+DIRS          = . $srcdir 
+MPI           = $mpi
+EXECNAME      = $model
+NAMELIST      = $input
+OUTPUT        = $output
+DEBUG         = $debug
+SVN_REVISION  = $svn_revision
+EOF
+#
+# Build the model:
+gmake -j8 all || echo ">>> Error return from gmake all" && exit 1
+#
+if ($exec == "FALSE") then
+  echo "Am NOT executing the model because exec = $exec"
+  exit 0
+endif
+#
+# Set data directory in PBS script:
+#
+cat << EOF >> $runscript
+  setenv TGCMDATA $tgcmdata
+EOF
+#
+# MPI/PBS job: append mpirun.command command to PBS script 
+# (it has #PBSs from above)
+#
+if ($mpi == "TRUE") then  # MPI PBS job
+  cat << EOF >> $runscript
+  setenv MP_LABELIO YES
+  setenv MP_SHARED_MEMORY yes
+  module load hdf5/1.10.7-gcc/8.4.1-mpi-cuda11_4
+#
+# Execute:
+  cd $execdir
+  `cat mpirun.command` -np $nprocs $model $input >&! $output
+#
+# Save stdout:
+  $rmbinchars $output # remove any non-ascii chars in stdout file
+  $mklogs $output     # break stdout into per-task log files
+  cd $output:h
+#
+# Make tar file of task log files:
+  tar -cf $output.tar *task*.out 
+  echo Saved stdout tar file $output.tar 
+  rm *task*.out
+EOF
+  echo " "
+  echo "Submitting PBS script $runscript for MPI run"
+  qsub < $runscript
+#
+# Non-mpi job: simple execution statement on the interactive node.
+# If you want to submit pbs job, you can use a here-doc like above
+# to put the execution statement in the runscript, then submit with
+# qsub as above.
+#
+else
+  echo "Executing serial non-MPI run in background on the interactive node.." 
+  $model < $input >&! $output &
+endif
+exit 0
